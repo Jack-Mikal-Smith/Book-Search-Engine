@@ -3,25 +3,16 @@ const { signToken } = require('../utils/auth');
 
 const resolvers = {
     Query: {
-        book: async (parent, { bookId }) => {
-            return Book.findOne({ _id: bookId });
-        },
-        books: async (parent, { username }) => {
-            const params = username ? { username } : {};
-            return Book.find(params).sort({ createdAt: -1 });
-        },
-        user: async (parent, { username }) => {
-            return User.findOne({ username }).populate('books')
-        },
         me: async (parent, args, context) => {
             if (context.user) {
-                return User.findOne({ _id: context.user._id }).populate('books');
+                return await User.findOne({ _id: context.user._id });
             }
             throw new AuthenticationError('You need to be logged in.');
         },
     },
     Mutation: {
         createUser: async (parent, { username, email, password}) => {
+            console.log('Test')
             const user = await User.create({ username, email, password });
             const token = signToken(user);
             return { token, user };
@@ -43,18 +34,18 @@ const resolvers = {
 
             return { token, user };
         },
-        saveBook: async (parent, {_id}, args) => {
+        saveBook: async (parent, {bookData}, context) => {
             const save = await User.findOneAndUpdate(
-                { _id },
-                { $addToSet: { ['savedBooks']: args } },
+                { _id: context.user._id },
+                { $push: { savedBooks: bookData } },
                 { new: true }
             );
             return save;
         },
-        deleteBook: async (parent, {_id}, args) => {
+        deleteBook: async (parent, {_id}, context) => {
             const bookToDelete = await User.findOneAndDelete(
-                { _id },
-                { $pull: { ['savedBooks']: args } }
+                { _id: context.user._id },
+                { $pull: { savedBooks: {_id} } }
             );
             return bookToDelete;
         },
