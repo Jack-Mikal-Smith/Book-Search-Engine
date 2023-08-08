@@ -1,3 +1,4 @@
+const { AuthenticationError } = require('apollo-server-express')
 const { Book, User } = require('../models');
 const { signToken } = require('../utils/auth');
 
@@ -5,7 +6,8 @@ const resolvers = {
     Query: {
         me: async (parent, args, context) => {
             if (context.user) {
-                return await User.findOne({ _id: context.user._id });
+                const userData = await User.findOne({ _id: context.user._id }).select('-__v -password');
+                return userData;
             }
             throw new AuthenticationError('You need to be logged in.');
         },
@@ -35,19 +37,28 @@ const resolvers = {
             return { token, user };
         },
         saveBook: async (parent, {bookData}, context) => {
-            const save = await User.findOneAndUpdate(
-                { _id: context.user._id },
-                { $push: { savedBooks: bookData } },
-                { new: true }
-            );
-            return save;
+            if (context.user) {
+                const save = await User.findByIdAndUpdate(
+                    { _id: context.user._id },
+                    { $push: { savedBooks: bookData } },
+                    { new: true }
+                );
+                return save;
+            }
+
+            throw new AuthenticationError('You need to log in');
         },
-        deleteBook: async (parent, {_id}, context) => {
-            const bookToDelete = await User.findOneAndDelete(
-                { _id: context.user._id },
-                { $pull: { savedBooks: {_id} } }
-            );
-            return bookToDelete;
+        deleteBook: async (parent, {bookId}, context) => {
+            if (context.user) {
+                const bookToDelete = await User.findOneAndDelete(
+                    { _id: context.user._id },
+                    { $pull: { savedBooks: {bookId} } },
+                    { new: true }
+                );
+                return bookToDelete;
+            }
+
+            throw new AuthenticationError('You need to log in')
         },
     },
 };
